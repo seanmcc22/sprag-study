@@ -1,4 +1,5 @@
 import streamlit as st
+from Login import run_login_page as run_login_page
 
 def authenticated_menu():
     """Sidebar menu for logged-in users"""
@@ -14,8 +15,7 @@ def authenticated_menu():
 
 def unauthenticated_menu():
     """Sidebar menu for logged-out users"""
-    st.sidebar.page_link("pages/1_Home.py", label="Home")
-    st.sidebar.page_link("Login.py", label="Login")
+    st.sidebar.page_link("app.py", label="Home")
 
 def menu():
     """Render correct menu based on auth"""
@@ -27,7 +27,8 @@ def menu():
 def menu_with_redirect():
     """Force redirect if unauthenticated"""
     if not st.session_state.get('user') or not st.session_state.get('role'):
-        st.switch_page("Login.py")
+        run_login_page()
+        st.stop()
     menu()
 
 def menu_home():
