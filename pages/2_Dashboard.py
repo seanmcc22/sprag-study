@@ -27,7 +27,7 @@ PRICE_5_CREDITS = os.environ.get("stripe_price_id_5_credit_bundle_test")
 
 def fetch_profile(user_id: str):
     response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
-    if response.status_code != 200 or not response.data:
+    if not response.data:
         st.error("Error fetching profile data.")
         return None
     return response.data
