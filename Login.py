@@ -11,9 +11,13 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def get_user_profile(user_id: str):
     """Fetch user profile by user id."""
     response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+
     if not response.data:
         return None
-    return response.data
+
+    # Supabase returns a list, so get the first item
+    profile = response.data[0] if isinstance(response.data, list) else response.data
+    return profile
 
 
 def create_profile_if_missing(user_id: str):
@@ -27,6 +31,8 @@ def create_profile_if_missing(user_id: str):
                 "is_subscribed": False,
                 "stripe_customer_id": ""
             }).execute()
+            if insert_response.data:
+                st.info("Profile created.")
         except Exception as e:
             st.error(f"Error creating profile: {e}")
 
@@ -35,21 +41,42 @@ def run_login_page():
     st.title("Welcome — Please Log In or Sign Up")
 
     st.subheader("Login")
+
+    # Always show logout button for clarity (optional)
+    logout_button()
+
     session = login_form(
         url=SUPABASE_URL,
         apiKey=SUPABASE_KEY,
         providers=["google"]
     )
-    if session is not None:
-        user = session['user']
-        user_id = user['id']
 
-        # Ensure profile exists
+    st.write("DEBUG — session:", session)
+
+    if session is not None:
+        user = session.get('user')
+        if not user:
+            st.warning("No user info found in session. Please try logging in again.")
+            st.stop()
+
+        user_id = user.get('id')
+        if not user_id:
+            st.warning("No user ID found. Something is wrong with the session.")
+            st.stop()
+
         create_profile_if_missing(user_id)
 
-        st.success("Login successful!")
         profile = get_user_profile(user_id)
+        if not profile:
+            st.error("Could not load your profile. Please contact support.")
+            st.stop()
+
         st.session_state['user'] = user
         st.session_state['is_authenticated'] = True
-        st.session_state['role'] = profile.get("role", "user") if profile else "user"
+        st.session_state['role'] = profile.get("role", "user")
+
+        st.success("Login successful!")
         st.rerun()
+
+    else:
+        st.info("Please log in to continue.")

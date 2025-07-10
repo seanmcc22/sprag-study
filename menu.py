@@ -13,23 +13,20 @@ def authenticated_menu():
 
 def unauthenticated_menu():
     """Sidebar menu for logged-out users"""
-    st.sidebar.page_link("app.py", label="Home")
+    st.sidebar.info("Please log in to access the app.")
 
 def menu():
     """Render correct menu based on auth"""
-    if st.session_state.get('user') and st.session_state.get('role'):
+    if st.session_state.get('user') and st.session_state.get('is_authenticated'):
         authenticated_menu()
     else:
         unauthenticated_menu()
 
 def menu_with_redirect():
     """Force redirect if unauthenticated"""
-    if not st.session_state.get('is_authenticated'):
-        from Login import run_login_page as run_login_page
+    if not st.session_state.get('user'):
+        # The key is: check the *real* session data, not just 'is_authenticated'.
+        from Login import run_login_page
         run_login_page()
         st.stop()
-    menu()
-
-def menu_home():
-    """Alias for using menu on Home page"""
     menu()

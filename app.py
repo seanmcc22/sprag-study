@@ -323,7 +323,9 @@ res = supabase.table("profiles") \
     .eq("id", user_id) \
     .limit(1) \
     .execute()
-profile = res.data
+profile = res.data[0] if res.data else None
+
+credits = profile["credits"]
 
 if not profile:
     st.error("⚠️ Could not load your profile; please contact support.")
