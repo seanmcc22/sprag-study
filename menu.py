@@ -2,7 +2,7 @@ import streamlit as st
 
 def authenticated_menu():
     """Sidebar menu for logged-in users"""
-    st.sidebar.page_link("pages/1_Home.py", label="Home")
+    st.sidebar.page_link("app.py", label="Home")
     st.sidebar.page_link("pages/2_Dashboard.py", label="Dashboard")
     st.sidebar.page_link("Login.py", label="Logout")
 
