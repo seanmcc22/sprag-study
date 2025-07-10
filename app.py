@@ -16,6 +16,7 @@ from streamlit_supabase_auth import login_form
 from menu import menu_with_redirect
 import tempfile
 import os
+from streamlit import switch_page
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -308,17 +309,17 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 # ─── Authentication & Profile Fetch ──────────────────────────────
 
 # 1) Force the user to sign in (or stop here)
-session = login_form(url=SUPABASE_URL, apiKey=SUPABASE_KEY, providers=["google"])
-if not session:
-    st.stop()
+if "user" not in st.session_state:
+    switch_page("Login")
+
+# 2) Extract user info from seesion_state
+user = st.session_state["user"]
+user_id = st.session_state["id"]
+user_email = user["email"]
 
 menu_with_redirect()
 
 st.title("Sprag - Study Assistant")
-
-# 2) Grab their id & email
-user_id    = session["user"]["id"]
-user_email = session["user"]["email"]
 
 # 3) Load their profile by id
 res = supabase.table("profiles") \

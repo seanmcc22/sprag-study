@@ -8,6 +8,7 @@ import streamlit_lightweight_charts.dataSamples as data
 from supabase import create_client, Client
 import stripe
 import os
+from streamlit import switch_page
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -72,12 +73,13 @@ def create_checkout_session(price_id, customer_email):
         return None
 
 def main():
-    session = login_form(url=SUPABASE_URL, apiKey=SUPABASE_KEY, providers=["github", "google"])
-    if not session:
-        st.stop()
+    if "user" not in st.session_state:
+        switch_page("Login")
 
-    user_id = session['user']['id']
-    user_email = session['user']['email']
+    # 2) Extract user info from seesion_state
+    user = st.session_state["user"]
+    user_id = st.session_state["id"]
+    user_email = user["email"]
 
     profile = fetch_profile(user_id)
     if not profile:
