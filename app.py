@@ -312,7 +312,7 @@ menu_with_redirect()
 
 # 2) Extract user info from seesion_state
 user = st.session_state["user"]
-user_id = st.session_state["id"]
+user_id = user["id"]
 user_email = user["email"]
 
 st.title("Sprag - Study Assistant")
