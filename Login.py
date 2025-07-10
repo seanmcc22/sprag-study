@@ -10,7 +10,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def get_user_profile(user_id: str):
     """Fetch user profile by user id."""
-    response = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
+    response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
     if response.error or response.data is None:
         return None
     return response.data
