@@ -10,18 +10,18 @@ import stripe
 import os
 
 # Initialize Supabase client
-SUPABASE_URL = os.environ.get["SUPABASE_URL"]
-SUPABASE_KEY = os.environ.get["SUPABASE_KEY"]
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize Stripe
-stripe.api_key = os.environ.get["STRIPE_SECRET_KEY"]
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 st.set_page_config(page_title="User Dashboard", layout="centered")
 
 # Price IDs for credit bundles from secrets
-PRICE_10_CREDITS = os.environ.get["stripe_price_id_10_credit_bundle_test"]
-PRICE_5_CREDITS = os.environ.get["stripe_price_id_5_credit_bundle_test"]
+PRICE_10_CREDITS = os.environ.get("stripe_price_id_10_credit_bundle_test")
+PRICE_5_CREDITS = os.environ.get("stripe_price_id_5_credit_bundle_test")
 
 def fetch_profile(user_id: str):
     """Fetch user profile by user id."""
@@ -63,8 +63,8 @@ def create_checkout_session(price_id, customer_email):
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=os.environ.get["success_url"],
-            cancel_url=os.environ.get["cancel_url"],
+            success_url=os.environ.get("success_url"),
+            cancel_url=os.environ.get("cancel_url"),
         )
         return session.url
     except Exception as e:

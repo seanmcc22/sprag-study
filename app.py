@@ -18,15 +18,15 @@ import tempfile
 import os
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
-SUPABASE_URL = os.environ.get["SUPABASE_URL"]
-SUPABASE_KEY = os.environ.get["SUPABASE_KEY"]
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-stripe.api_key = os.environ.get["STRIPE_SECRET_KEY"]
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 # ─── OpenAI Setup ──────────────────────────────────────────────
 
-client = OpenAI(api_key=os.environ.get["openai"]["api_key"])
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 OPENAI_MODEL = "gpt-4.1-mini"
 
 def call_openai_system_user(system: str, user: str, max_tokens: int = 512, temp: float = 0.0) -> str:
