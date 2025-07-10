@@ -1,113 +1,100 @@
+import os
 import streamlit as st
 from supabase import create_client, Client
-from streamlit_supabase_auth import login_form, logout_button
 import stripe
-import streamlit_shadcn_ui as ui
-from datetime import datetime, timedelta
-from streamlit.proto.Skeleton_pb2 import Skeleton as SkeletonProto
-import os
-from dotenv import find_dotenv, load_dotenv
+from dotenv import load_dotenv
 
-load_dotenv(find_dotenv())
-# Initialization with Supabase credentials
+load_dotenv()
+
+# Initialize Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-stripe_product_id_starter = ""
-stripe_product_id_teams = ""
-stripe_product_id_enterprise = ""
+# Initialize Stripe client
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
-stripe_to_supabase_mapping = {
-    stripe_product_id_starter: 1,
-    stripe_product_id_teams: 2,
-    stripe_product_id_enterprise: 3
-}
+# Load your Stripe product or price IDs from environment
+STRIPE_PRICE_ID_5_CREDITS = os.getenv("STRIPE_PRICE_ID_5_CREDITS")
+STRIPE_PRICE_ID_10_CREDITS = os.getenv("STRIPE_PRICE_ID_10_CREDITS")
+STRIPE_SUBSCRIPTION_PRICE_ID_MONTHLY = os.getenv("STRIPE_SUBSCRIPTION_PRICE_ID_MONTHLY")
+# Add more if needed
 
-stripe_link_starter = "https://buy.stripe.com/"
-stripe_link_teams = "https://buy.stripe.com/"
-stripe_link_enterprise = "https://buy.stripe.com/"
-
-
-def ensure_user_in_database(user_id: str, email: str, name: str = None):
-    user_data = supabase.table("User").select("*").eq("id", user_id).execute()
-    if not user_data.data:
-        user = {
+def ensure_user_in_profiles(user_id: str):
+    """Make sure the user exists in the profiles table, if not create with defaults."""
+    response = supabase.table("profiles").select("*").eq("id", user_id).execute()
+    if not response.data:
+        # User doesn't exist, insert new profile
+        insert_resp = supabase.table("profiles").insert({
             "id": user_id,
-            "email": email,
-            "name": name
-        }
-        insert_data = supabase.table("User").insert(user).execute()
-        if insert_data.data == None:
-            st.error(f"Failed to create user in the database.")
+            "credits": 0,
+            "is_subscribed": False
+        }).execute()
+        if insert_resp.error:
+            st.error(f"Error creating user profile: {insert_resp.error.message}")
         else:
-            st.success("User added to the database.")
-    return user_data.data
+            st.success("User profile created.")
+    return
 
-def update_user_subscription(email, subscription_id, subscription_tier_data):
-    current_date = datetime.now()
+def update_subscription_status(user_id: str, subscribed: bool):
+    """Update is_subscribed flag for the user."""
+    response = supabase.table("profiles").update({
+        "is_subscribed": subscribed
+    }).eq("id", user_id).execute()
+    if response.error:
+        st.error(f"Error updating subscription status: {response.error.message}")
+    return
 
-    # Add 30 days to get the end date
-    end_date = current_date + timedelta(days=30)
+def add_credits(user_id: str, credits_to_add: float):
+    """Add credits to the user profile."""
+    profile_resp = supabase.table("profiles").select("credits").eq("id", user_id).single().execute()
+    if profile_resp.error:
+        st.error(f"Error fetching user credits: {profile_resp.error.message}")
+        return
+    current_credits = profile_resp.data.get("credits", 0) or 0
+    new_credits = current_credits + credits_to_add
+    update_resp = supabase.table("profiles").update({"credits": new_credits}).eq("id", user_id).execute()
+    if update_resp.error:
+        st.error(f"Error updating credits: {update_resp.error.message}")
+    else:
+        st.success(f"Added {credits_to_add} credits. New total: {new_credits}")
 
-    # Convert both dates to strings in the desired format
-    datetime_format = "%Y-%m-%dT%H:%M:%SZ"  # Example format
-    current_date_str = current_date.strftime(datetime_format)
-    end_date_str = end_date.strftime(datetime_format)
-    print("START DATE", current_date_str)
-    print("END DATE", end_date_str)
-
-    update_response = supabase.table("User").update({
-        "subscriptionTierId": subscription_id,
-        "subscriptionStartDate": current_date_str,
-        "subscriptionEndDate": end_date_str,
-    }).eq("email", email).execute()
-
-    success = update_response.data is not None
-    print(f"Subscription update success: {success}, Error: {update_response.error}")
-    return success
-
-def is_active_subscriber(email: str) -> bool:
-    customers = stripe.Customer.list(email=email)
+def is_user_subscribed(stripe_customer_id: str) -> bool:
+    """Check via Stripe if user has an active subscription."""
     try:
-        customer = customers.data[0]
-    except IndexError:
+        subscriptions = stripe.Subscription.list(customer=stripe_customer_id, status='all', limit=100)
+        for sub in subscriptions.auto_paging_iter():
+            if sub.status == 'active':
+                return True
+        return False
+    except Exception as e:
+        st.error(f"Stripe API error: {e}")
         return False
 
-    subscriptions = stripe.Subscription.list(customer=customer["id"])
-    st.session_state.subscriptions = subscriptions
-    # st.text(subscriptions.data[0])
-    # st.text(subscriptions.data[0].plan.product)
+def get_user_profile(user_id: str):
+    """Fetch user profile from Supabase."""
+    resp = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
+    if resp.error:
+        st.error(f"Error fetching user profile: {resp.error.message}")
+        return None
+    return resp.data
 
-    return len(subscriptions.data) > 0 and subscriptions.data[0].status == "active"
+# Example usage inside Streamlit app
+def main():
+    st.title("User Dashboard")
 
-@st.cache_data
-def fetch_user_subscription(email):
-    print("Fetching user subscription for:", email)
-    if is_active_subscriber(email):
-        user_data = supabase.table("User").select("*").eq("email", email).execute()
-        if user_data.data:
-            user = user_data.data[0]
-            print("User data found:", user)
-            if user['subscriptionTierId'] is None:
-                stripe_subscription_id = st.session_state.subscriptions.data[0].plan.product
-                print("Stripe subscription ID:", stripe_subscription_id)
-                if stripe_subscription_id in stripe_to_supabase_mapping:
-                    supabase_subscription_id = stripe_to_supabase_mapping[stripe_subscription_id]
-                    print("Mapped Supabase subscription ID:", supabase_subscription_id)
-                    subscription_tier_data = supabase.table("SubscriptionTier").select("*").eq("id", supabase_subscription_id).execute().data[0]
-                    if update_user_subscription(email, supabase_subscription_id, subscription_tier_data):
-                        return subscription_tier_data
-            else:
-                return supabase.table("SubscriptionTier").select("*").eq("id", user['subscriptionTierId']).execute().data
-        else:
-            print("No user data found.")
-    else:
-        print("User is not an active subscriber.")
-    return None
+    # Suppose you get user_id from your auth system
+    user_id = st.session_state.get("user_id")
+    if not user_id:
+        st.warning("User not logged in")
+        return
 
-def get_user_details(email):
-    user_data = supabase.table("User").select("*").eq("email", email).execute().data
-    if user_data:
-        return user_data[0]
-    return None
+    ensure_user_in_profiles(user_id)
+    profile = get_user_profile(user_id)
+
+    if profile:
+        st.write(f"Credits: {profile.get('credits', 0)}")
+        st.write(f"Subscribed: {profile.get('is_subscribed', False)}")
+
+if __name__ == "__main__":
+    main()

@@ -17,3 +17,9 @@ python-dotenv
 extra-streamlit-components
 beautifulsoup4
 streamlit-lightweight-charts
+plotly
+pandas
+pdfplumber
+pylatex
+openai
+kaleido

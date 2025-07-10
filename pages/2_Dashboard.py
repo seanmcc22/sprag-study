@@ -1,202 +1,148 @@
 import streamlit as st
-import streamlit_shadcn_ui as ui
-from datetime import datetime, timedelta
 from streamlit_supabase_auth import login_form, logout_button
-import random
 import pandas as pd
+from datetime import datetime
+from streamlit_shadcn_ui import metric_card
 from streamlit_lightweight_charts import renderLightweightCharts
 import streamlit_lightweight_charts.dataSamples as data
-from menu import menu_with_redirect
-# import stripe
-# from server import ensure_user_in_database, fetch_user_subscription, get_user_details, fetch_user_projects, display_subscription_info
+from supabase import create_client, Client
+import stripe
 
-# Initialization with Supabase credentials
+# Initialize Supabase client
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-test_mode = st.secrets["testing_mode"]
-# if test_mode == "true":
-#     stripe.api_key = st.secrets["stripe_api_key_test"]
-#     print("Testing mode.")
-# elif test_mode == "false":
-#     stripe.api_key = st.secrets["stripe_api_key"]
-#     print("Live mode.")
+# Initialize Stripe
+stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
 
-st.set_page_config(
-    page_title="User Dashboard",
-    page_icon="🧑🏻‍💻",
-    layout="centered"
-)
-menu_with_redirect()
+st.set_page_config(page_title="User Dashboard", layout="centered")
 
-def generate_fake_data():
-    token_usage = random.randint(1000, 10000)
-    storage_used = round(random.uniform(10.0, 50.0), 2)
-    project_count = random.randint(1, 10)
-    max_token_usage = 15000
-    max_storage = 100
-    max_projects = 20
-    return token_usage, storage_used, project_count, max_token_usage, max_storage, max_projects
+# Price IDs for credit bundles from secrets
+PRICE_10_CREDITS = st.secrets["stripe_price_id_10_credit_bundle_test"]
+PRICE_5_CREDITS = st.secrets["stripe_price_id_5_credit_bundle_test"]
 
-def generate_fake_project_data(num_projects):
-    projects = []
-    for i in range(num_projects):
-        project = {
-            'name': f'Project {i+1}',
-            'created_at': datetime.now() - timedelta(days=random.randint(1, 100))
-        }
-        projects.append(project)
-    return projects
+def fetch_profile(email: str):
+    """Fetch user profile from Supabase by email."""
+    response = supabase.table("profiles").select("*").eq("email", email).single().execute()
+    if response.error or response.data is None:
+        st.error("Error fetching profile data.")
+        return None
+    return response.data
+
+def fetch_stripe_subscription(stripe_customer_id: str):
+    """Fetch active subscription info from Stripe for customer."""
+    try:
+        subs = stripe.Subscription.list(customer=stripe_customer_id, status='active', limit=1)
+        if subs.data:
+            sub = subs.data[0]
+            price = sub['items']['data'][0]['price']
+            product = stripe.Product.retrieve(price['product'])
+            return {
+                'tier_name': product['name'],
+                'price': price['unit_amount'] / 100,  # convert cents to dollars
+                'currency': price['currency'].upper(),
+                'current_period_end': datetime.fromtimestamp(sub['current_period_end']),
+                'subscription_id': sub['id']
+            }
+        else:
+            return None
+    except Exception as e:
+        st.error(f"Stripe API error: {e}")
+        return None
+
+def create_checkout_session(price_id, customer_email):
+    """Create a Stripe Checkout session and return the URL."""
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            customer_email=customer_email,
+            line_items=[{
+                'price': price_id,
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=st.secrets["success_url"],  # e.g. your deployed app URL + /success
+            cancel_url=st.secrets["cancel_url"],
+        )
+        return session.url
+    except Exception as e:
+        st.error(f"Stripe checkout creation error: {e}")
+        return None
 
 def main():
-    # Configure Supabase authentication
     session = login_form(url=SUPABASE_URL, apiKey=SUPABASE_KEY, providers=["github", "google"])
+    if not session:
+        st.stop()
 
-    if session:
-        user_id = session['user']['id']
-        user_email = session['user']['email']
-        user_name = session['user']['user_metadata']['name']
-        
-        # Ensure user exists in database
-        # ensure_user_in_database(user_id, user_email, user_name)
+    user_email = session['user']['email']
 
-        st.header("Dashboard")
+    profile = fetch_profile(user_email)
+    if not profile:
+        st.stop()
 
-        # Toggle button to simulate subscription status
-        subscribed = st.sidebar.checkbox("Toggle Subscription Status")
+    st.header("Dashboard")
+    st.write(f"👋 Welcome, **{user_email}**!")
 
-        if subscribed:
-            st.success("User is subscribed")
-            # Fetch user details and subscription info if subscribed
-            # user_details = get_user_details(user_email)
-            # subscription_info = fetch_user_subscription(user_email)
+    credits = profile.get("credit", 0)
+    is_subscribed = profile.get("is_subscribed", False)
+    stripe_customer_id = profile.get("stripe_customer_id")
 
-            # Simulate user details and subscription info
-            user_details = {
-                'tokenUsage': 5000,
-                'storageUsed': 25.5,
-            }
-            subscription_info = [{
-                'tokenLimit': 15000,
-                'storageLimit': 100,
-                'projectLimit': 20
-            }]
-
-            token_usage = user_details.get('tokenUsage', 0)
-            storage_used = user_details.get('storageUsed', 0)
-            projects = generate_fake_project_data(5)  # Replace with: fetch_user_projects(user_email)
-            project_count = len(projects)
-
-            max_token_usage = subscription_info[0]['tokenLimit']
-            max_storage = subscription_info[0]['storageLimit']
-            max_projects = subscription_info[0]['projectLimit']
-
-            cols = st.columns(3)
-            with cols[0]:
-                ui.metric_card(
-                    title="Token Usage",
-                    content=f"{token_usage}/{max_token_usage}",
-                    description="Your token consumption",
-                    key="token_usage"
-                )
-            with cols[1]:
-                ui.metric_card(
-                    title="Storage Used",
-                    content=f"{storage_used} GB / {max_storage} GB",
-                    description="Your storage usage",
-                    key="storage_usage"
-                )
-            with cols[2]:
-                ui.metric_card(
-                    title="Projects",
-                    content=f"{project_count}/{max_projects}",
-                    description="Number of projects",
-                    key="project_count"
-                )
-            
-            st.subheader("Project Details")
-            for project in projects:
-                st.write(f"**{project['name']}** - Created at: {project['created_at']}")
-            
-            # display_subscription_info(user_email)
+    if is_subscribed and stripe_customer_id:
+        sub_info = fetch_stripe_subscription(stripe_customer_id)
+        if sub_info:
+            st.success(f"Subscription Active: **{sub_info['tier_name']}**")
+            st.write(f"Price: {sub_info['price']} {sub_info['currency']} per billing cycle")
+            st.write(f"Renewal Date: {sub_info['current_period_end'].strftime('%Y-%m-%d')}")
+            if st.button("Unsubscribe"):
+                st.warning("Unsubscribe functionality not implemented yet.")
         else:
-            st.warning("User is not subscribed")
-            # Generate fake data if not subscribed
-            token_usage, storage_used, project_count, max_token_usage, max_storage, max_projects = generate_fake_data()
-            cols = st.columns(3)
-            with cols[0]:
-                ui.metric_card(
-                    title="Token Usage",
-                    content=f"25/100",
-                    description="Your token consumption",
-                    key="token_usage"
-                )
-            with cols[1]:
-                ui.metric_card(
-                    title="Storage Used",
-                    content=f"1.7 GB / 5 GB",
-                    description="Your storage usage",
-                    key="storage_usage"
-                )
-            with cols[2]:
-                ui.metric_card(
-                    title="Projects",
-                    content=f"2/3",
-                    description="Number of projects",
-                    key="project_count"
-                )
-                
-            st.subheader("Project Details")
-            projects = generate_fake_project_data(2)
-            for project in projects:
-                st.write(f"**{project['name']}** - Created at: {project['created_at']}")
+            st.warning("No active subscription found on Stripe.")
+    else:
+        st.warning("You are not subscribed.")
 
-        st.subheader("Token Usage Chart")
-        chartOptions = {
-            "layout": {
-                "textColor": 'black',
-                "background": {
-                    "type": 'solid',
-                    "color": 'white'
-                }
-            }
-        }
+    st.metric("Credits", credits)
 
-        renderLightweightCharts([
-            {
-                "chart": chartOptions,
-                "series": [{
-                    "type": 'Area',
-                    "data": data.seriesMultipleChartArea01,
-                    "options": {}
-                }],
-            }
-        ], 'area')
+    # Buy credit bundles
+    st.subheader("Buy Credits")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Buy 10 Credit Bundle ($9.99)"):
+            url = create_checkout_session(PRICE_10_CREDITS, user_email)
+            if url:
+                st.experimental_set_query_params()
+                st.markdown(f"[Click here to complete purchase]({url})")
+    with col2:
+        if st.button("Buy 5 Credit Bundle ($4.99)"):
+            url = create_checkout_session(PRICE_5_CREDITS, user_email)
+            if url:
+                st.experimental_set_query_params()
+                st.markdown(f"[Click here to complete purchase]({url})")
 
-        st.subheader("Data Tables")
-        token_usage_data = {
-            'Token Usage': [token_usage],
-            'Max Token Usage': [max_token_usage]
-        }
-        storage_data = {
-            'Storage Used (GB)': [storage_used],
-            'Max Storage (GB)': [max_storage]
-        }
-        projects_data = {
-            'Project Count': [project_count],
-            'Max Projects': [max_projects]
-        }
+    # Placeholder projects
+    projects = [{'name': 'Project A', 'created_at': datetime.now()}, {'name': 'Project B', 'created_at': datetime.now()}]
 
-        st.table(pd.DataFrame(token_usage_data))
-        st.table(pd.DataFrame(storage_data))
-        st.table(pd.DataFrame(projects_data))
+    st.subheader("Your Projects")
+    for p in projects:
+        st.write(f"- **{p['name']}** created {p['created_at'].strftime('%Y-%m-%d')}")
 
-        # Sidebar with logout
-        with st.sidebar:
-            st.markdown(f"*Welcome **{session['user']['email']}***")
-            if logout_button(url=SUPABASE_URL, apiKey=SUPABASE_KEY):
-                st.session_state['user'] = None
-                st.experimental_rerun()
+    st.subheader("Usage Chart")
+    renderLightweightCharts([{
+        "chart": {
+            "layout": {"textColor": 'black', "background": {"type": 'solid', "color": 'white'}}
+        },
+        "series": [{"type": 'Area', "data": data.seriesMultipleChartArea01}],
+    }], 'area')
+
+    st.subheader("Usage Table")
+    st.table(pd.DataFrame({'Credits': [credits]}))
+
+    with st.sidebar:
+        st.divider()
+        st.caption(f"Logged in as {user_email}")
+        if logout_button(url=SUPABASE_URL, apiKey=SUPABASE_KEY):
+            st.session_state.clear()
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
