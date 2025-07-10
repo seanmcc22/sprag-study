@@ -47,7 +47,6 @@ def run_login_page():
             url=SUPABASE_URL,
             apiKey=SUPABASE_KEY,
             providers=["google"],
-            email_password=True,
             show_sign_up=False
         )
         if session:
@@ -86,13 +85,3 @@ def run_login_page():
             st.session_state['is_authenticated'] = True
             st.session_state['role'] = profile.get("role", "user") if profile else "user"
             redirect_to_app()
-
-    if st.session_state.get('is_authenticated'):
-        menu()
-        with st.sidebar:
-            st.markdown(f"**Logged in as: *{st.session_state['user']['email']}***")
-            if logout_button(url=SUPABASE_URL, apiKey=SUPABASE_KEY):
-                st.session_state.clear()
-                st.experimental_rerun()
-    else:
-        unauthenticated_menu()
