@@ -74,7 +74,8 @@ def create_checkout_session(price_id, customer_email):
 
 def main():
     if "user" not in st.session_state:
-        switch_page("Login")
+        st.experimental_set_query_params(page="Login")
+        st.experimental_rerun()
 
     # 2) Extract user info from seesion_state
     user = st.session_state["user"]

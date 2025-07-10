@@ -310,7 +310,8 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 # 1) Force the user to sign in (or stop here)
 if "user" not in st.session_state:
-    switch_page("Login")
+    st.experimental_set_query_params(page="Login")
+    st.experimental_rerun()
 
 # 2) Extract user info from seesion_state
 user = st.session_state["user"]
@@ -341,11 +342,6 @@ if not profile.get("stripe_customer_id"):
       .eq("id", user_id) \
       .execute()
     profile["stripe_customer_id"] = cust["id"]
-
-# 5) Now we can show their current credit balance
-credits = profile.get("credits", 0)
-st.sidebar.header("Your Credits")
-st.sidebar.metric("Remaining", credits)
 
 
 subject = st.text_input("Subject (e.g., Atomic Physics)")
