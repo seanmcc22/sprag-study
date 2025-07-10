@@ -8,11 +8,6 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def redirect_to_app():
-    st.query_params["page"] = "app"
-    st.rerun()
-
-
 def get_user_profile(user_id: str):
     """Fetch user profile by user id."""
     response = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
@@ -39,49 +34,22 @@ def run_login_page():
     st.set_page_config(page_title="Login or Signup", layout="centered")
     st.title("Welcome — Please Log In or Sign Up")
 
-    tab_login, tab_signup = st.tabs(["Login", "Sign Up"])
+    st.subheader("Login")
+    session = login_form(
+        url=SUPABASE_URL,
+        apiKey=SUPABASE_KEY,
+        providers=["google"]
+    )
+    if session:
+        user = session['user']
+        user_id = user['id']
 
-    with tab_login:
-        st.subheader("Login")
-        session = login_form(
-            url=SUPABASE_URL,
-            apiKey=SUPABASE_KEY,
-            providers=["google"],
-            show_sign_up=False
-        )
-        if session:
-            user = session['user']
-            user_id = user['id']
+        # Ensure profile exists
+        create_profile_if_missing(user_id)
 
-            # Ensure profile exists
-            create_profile_if_missing(user_id)
-
-            st.success("Login successful!")
-            profile = get_user_profile(user_id)
-            st.session_state['user'] = user
-            st.session_state['is_authenticated'] = True
-            st.session_state['role'] = profile.get("role", "user") if profile else "user"
-            redirect_to_app()
-
-    with tab_signup:
-        st.subheader("Create a new account")
-        new_user = login_form(
-            url=SUPABASE_URL,
-            apiKey=SUPABASE_KEY,
-            providers=["google"],
-            email_password=True,
-            show_sign_up=True,         
-        )
-        if new_user:
-            user = new_user['user']
-            user_id = user['id']
-
-            # Ensure profile exists
-            create_profile_if_missing(user_id)
-
-            st.success("Signup successful! Please check your email to confirm.")
-            profile = get_user_profile(user_id)
-            st.session_state['user'] = user
-            st.session_state['is_authenticated'] = True
-            st.session_state['role'] = profile.get("role", "user") if profile else "user"
-            redirect_to_app()
+        st.success("Login successful!")
+        profile = get_user_profile(user_id)
+        st.session_state['user'] = user
+        st.session_state['is_authenticated'] = True
+        st.session_state['role'] = profile.get("role", "user") if profile else "user"
+        st.rerun()
