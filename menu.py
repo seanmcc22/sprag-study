@@ -1,5 +1,4 @@
 import streamlit as st
-from Login import run_login_page as run_login_page
 
 def authenticated_menu():
     """Sidebar menu for logged-in users"""
@@ -27,6 +26,7 @@ def menu():
 def menu_with_redirect():
     """Force redirect if unauthenticated"""
     if not st.session_state.get('user') or not st.session_state.get('role'):
+        from Login import run_login_page as run_login_page
         run_login_page()
         st.stop()
     menu()

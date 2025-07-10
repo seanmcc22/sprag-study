@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_supabase_auth import login_form, logout_button
 from supabase import create_client, Client
-from menu import menu, unauthenticated_menu
 import os
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")

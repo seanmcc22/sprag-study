@@ -17,7 +17,6 @@ from menu import menu_with_redirect
 import tempfile
 import os
 from streamlit import switch_page
-from Login import run_login_page as run_login_page
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -310,10 +309,6 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 # ─── Authentication & Profile Fetch ──────────────────────────────
 
 menu_with_redirect()
-
-if "user" not in st.session_state:
-    run_login_page()
-    st.stop()
 
 # 2) Extract user info from seesion_state
 user = st.session_state["user"]

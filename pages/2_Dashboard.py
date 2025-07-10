@@ -8,9 +8,7 @@ import streamlit_lightweight_charts.dataSamples as data
 from supabase import create_client, Client
 import stripe
 import os
-
-# ✅ Import the Login logic directly
-from Login import run_login_page as run_login_page
+from menu import menu_with_redirect
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -75,9 +73,7 @@ def create_checkout_session(price_id, customer_email):
 
 def main():
     # ✅ If not logged in, show login page in-place
-    if "user" not in st.session_state:
-        run_login_page()
-        st.stop()
+    menu_with_redirect()
 
     user = st.session_state["user"]
     user_id = user["id"]
