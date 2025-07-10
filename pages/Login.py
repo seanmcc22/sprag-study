@@ -13,8 +13,8 @@ st.set_page_config(page_title="Login or Signup", layout="centered")
 st.title("Welcome — Please Log In or Sign Up")
 
 def redirect_to_app():
-    st.experimental_set_query_params(page="app")
-    st.experimental_rerun()
+    st.query_params(page="app")
+    st.rerun()
 
 def get_user_profile(user_id: str):
     """Fetch user profile by user id."""

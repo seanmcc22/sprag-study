@@ -310,8 +310,8 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 # 1) Force the user to sign in (or stop here)
 if "user" not in st.session_state:
-    st.experimental_set_query_params(page="Login")
-    st.experimental_rerun()
+    st.query_params(page="Login")
+    st.rerun()
 
 # 2) Extract user info from seesion_state
 user = st.session_state["user"]
