@@ -11,7 +11,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def get_user_profile(user_id: str):
     """Fetch user profile by user id."""
     response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
-    if response.error or response.data is None:
+    if response.status_code != 200 or not response.data:
         return None
     return response.data
 
@@ -26,7 +26,7 @@ def create_profile_if_missing(user_id: str):
             "is_subscribed": False,
             "stripe_customer_id": ""
         }).execute()
-        if insert_response.error:
+        if insert_response.status_code != 201:
             st.error(f"Error creating profile: {insert_response.error.message}")
 
 
