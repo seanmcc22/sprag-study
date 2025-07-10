@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_supabase_auth import login_form, logout_button
+from streamlit_supabase_auth import logout_button
 import pandas as pd
 from datetime import datetime
 from streamlit_shadcn_ui import metric_card
@@ -8,7 +8,9 @@ import streamlit_lightweight_charts.dataSamples as data
 from supabase import create_client, Client
 import stripe
 import os
-from streamlit import switch_page
+
+# ✅ Import the Login logic directly
+from Login import main as run_login_page
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -20,12 +22,12 @@ stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 st.set_page_config(page_title="User Dashboard", layout="centered")
 
-# Price IDs for credit bundles from secrets
+# Price IDs for credit bundles
 PRICE_10_CREDITS = os.environ.get("stripe_price_id_10_credit_bundle_test")
 PRICE_5_CREDITS = os.environ.get("stripe_price_id_5_credit_bundle_test")
 
+
 def fetch_profile(user_id: str):
-    """Fetch user profile by user id."""
     response = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
     if response.error or response.data is None:
         st.error("Error fetching profile data.")
@@ -33,7 +35,6 @@ def fetch_profile(user_id: str):
     return response.data
 
 def fetch_stripe_subscription(stripe_customer_id: str):
-    """Fetch active subscription info from Stripe for customer."""
     try:
         subs = stripe.Subscription.list(customer=stripe_customer_id, status='active', limit=1)
         if subs.data:
@@ -54,7 +55,6 @@ def fetch_stripe_subscription(stripe_customer_id: str):
         return None
 
 def create_checkout_session(price_id, customer_email):
-    """Create a Stripe Checkout session and return the URL."""
     try:
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
@@ -72,14 +72,15 @@ def create_checkout_session(price_id, customer_email):
         st.error(f"Stripe checkout creation error: {e}")
         return None
 
-def main():
-    if "user" not in st.session_state:
-        st.query_params["page"] = "Login"
-        st.rerun()
 
-    # 2) Extract user info from seesion_state
+def main():
+    # ✅ If not logged in, show login page in-place
+    if "user" not in st.session_state:
+        run_login_page()
+        st.stop()
+
     user = st.session_state["user"]
-    user_id = st.session_state["id"]
+    user_id = user["id"]
     user_email = user["email"]
 
     profile = fetch_profile(user_id)
@@ -114,13 +115,11 @@ def main():
         if st.button("Buy 10 Credit Bundle ($9.99)"):
             url = create_checkout_session(PRICE_10_CREDITS, user_email)
             if url:
-                st.experimental_set_query_params()
                 st.markdown(f"[Click here to complete purchase]({url})")
     with col2:
         if st.button("Buy 5 Credit Bundle ($4.99)"):
             url = create_checkout_session(PRICE_5_CREDITS, user_email)
             if url:
-                st.experimental_set_query_params()
                 st.markdown(f"[Click here to complete purchase]({url})")
 
     projects = [{'name': 'Project A', 'created_at': datetime.now()}, {'name': 'Project B', 'created_at': datetime.now()}]
@@ -146,6 +145,7 @@ def main():
         if logout_button(url=SUPABASE_URL, apiKey=SUPABASE_KEY):
             st.session_state.clear()
             st.experimental_rerun()
+
 
 if __name__ == "__main__":
     main()

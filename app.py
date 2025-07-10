@@ -17,6 +17,7 @@ from menu import menu_with_redirect
 import tempfile
 import os
 from streamlit import switch_page
+from Login import main as run_login_page
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -308,17 +309,16 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 # ─── Authentication & Profile Fetch ──────────────────────────────
 
-# 1) Force the user to sign in (or stop here)
+menu_with_redirect()
+
 if "user" not in st.session_state:
-    st.query_params["page"] = "Login"
-    st.rerun()
+    run_login_page()
+    st.stop()
 
 # 2) Extract user info from seesion_state
 user = st.session_state["user"]
 user_id = st.session_state["id"]
 user_email = user["email"]
-
-menu_with_redirect()
 
 st.title("Sprag - Study Assistant")
 
@@ -639,8 +639,8 @@ if st.button("Run Selected Tasks"):
     new_credits = credits - cost
     # update Supabase
     supabase.table("profiles") \
-        .update({"credit": new_credits}) \
-        .eq("email", user_email) \
+        .update({"credits": new_credits}) \
+        .eq("id", user_id) \
         .execute()
     # show updated balance in sidebar
     st.sidebar.metric("Remaining Credits", new_credits)
