@@ -26,7 +26,6 @@ def create_profile_if_missing(user_id: str):
     if not profile:
         try:
             insert_response = supabase.table("profiles").insert({
-                "id": user_id,
                 "credits": 0,
                 "is_subscribed": False,
                 "stripe_customer_id": ""
