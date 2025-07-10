@@ -4,7 +4,6 @@ def authenticated_menu():
     """Sidebar menu for logged-in users"""
     st.sidebar.page_link("app.py", label="Home")
     st.sidebar.page_link("pages/2_Dashboard.py", label="Dashboard")
-    st.sidebar.page_link("Login.py", label="Logout")
 
     role = st.session_state.get('role')
     if role in ["admin", "super-admin"]:
