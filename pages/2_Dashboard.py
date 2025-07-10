@@ -7,24 +7,25 @@ from streamlit_lightweight_charts import renderLightweightCharts
 import streamlit_lightweight_charts.dataSamples as data
 from supabase import create_client, Client
 import stripe
+import os
 
 # Initialize Supabase client
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+SUPABASE_URL = os.environ.get["SUPABASE_URL"]
+SUPABASE_KEY = os.environ.get["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Initialize Stripe
-stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
+stripe.api_key = os.environ.get["STRIPE_SECRET_KEY"]
 
 st.set_page_config(page_title="User Dashboard", layout="centered")
 
 # Price IDs for credit bundles from secrets
-PRICE_10_CREDITS = st.secrets["stripe_price_id_10_credit_bundle_test"]
-PRICE_5_CREDITS = st.secrets["stripe_price_id_5_credit_bundle_test"]
+PRICE_10_CREDITS = os.environ.get["stripe_price_id_10_credit_bundle_test"]
+PRICE_5_CREDITS = os.environ.get["stripe_price_id_5_credit_bundle_test"]
 
-def fetch_profile(email: str):
-    """Fetch user profile from Supabase by email."""
-    response = supabase.table("profiles").select("*").eq("email", email).single().execute()
+def fetch_profile(user_id: str):
+    """Fetch user profile by user id."""
+    response = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
     if response.error or response.data is None:
         st.error("Error fetching profile data.")
         return None
@@ -40,7 +41,7 @@ def fetch_stripe_subscription(stripe_customer_id: str):
             product = stripe.Product.retrieve(price['product'])
             return {
                 'tier_name': product['name'],
-                'price': price['unit_amount'] / 100,  # convert cents to dollars
+                'price': price['unit_amount'] / 100,
                 'currency': price['currency'].upper(),
                 'current_period_end': datetime.fromtimestamp(sub['current_period_end']),
                 'subscription_id': sub['id']
@@ -62,8 +63,8 @@ def create_checkout_session(price_id, customer_email):
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=st.secrets["success_url"],  # e.g. your deployed app URL + /success
-            cancel_url=st.secrets["cancel_url"],
+            success_url=os.environ.get["success_url"],
+            cancel_url=os.environ.get["cancel_url"],
         )
         return session.url
     except Exception as e:
@@ -75,16 +76,17 @@ def main():
     if not session:
         st.stop()
 
+    user_id = session['user']['id']
     user_email = session['user']['email']
 
-    profile = fetch_profile(user_email)
+    profile = fetch_profile(user_id)
     if not profile:
         st.stop()
 
     st.header("Dashboard")
     st.write(f"👋 Welcome, **{user_email}**!")
 
-    credits = profile.get("credit", 0)
+    credits = profile.get("credits", 0)
     is_subscribed = profile.get("is_subscribed", False)
     stripe_customer_id = profile.get("stripe_customer_id")
 
@@ -103,7 +105,6 @@ def main():
 
     st.metric("Credits", credits)
 
-    # Buy credit bundles
     st.subheader("Buy Credits")
     col1, col2 = st.columns(2)
     with col1:
@@ -119,7 +120,6 @@ def main():
                 st.experimental_set_query_params()
                 st.markdown(f"[Click here to complete purchase]({url})")
 
-    # Placeholder projects
     projects = [{'name': 'Project A', 'created_at': datetime.now()}, {'name': 'Project B', 'created_at': datetime.now()}]
 
     st.subheader("Your Projects")

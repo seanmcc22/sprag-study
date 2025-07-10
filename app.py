@@ -10,7 +10,7 @@ from openai import OpenAI
 import json
 import plotly.express as px
 import pandas as pd
-from supabase import create_client
+from supabase import create_client, Client
 import stripe
 from streamlit_supabase_auth import login_form
 from menu import menu_with_redirect
@@ -18,15 +18,15 @@ import tempfile
 import os
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+SUPABASE_URL = os.environ.get["SUPABASE_URL"]
+SUPABASE_KEY = os.environ.get["SUPABASE_KEY"]
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
+stripe.api_key = os.environ.get["STRIPE_SECRET_KEY"]
 
 # ─── OpenAI Setup ──────────────────────────────────────────────
 
-client = OpenAI(api_key=st.secrets["openai"]["api_key"])
+client = OpenAI(api_key=os.environ.get["openai"]["api_key"])
 OPENAI_MODEL = "gpt-4.1-mini"
 
 def call_openai_system_user(system: str, user: str, max_tokens: int = 512, temp: float = 0.0) -> str:
@@ -316,13 +316,14 @@ menu_with_redirect()
 
 st.title("Sprag - Study Assistant")
 
-# 2) Grab their email
+# 2) Grab their id & email
+user_id    = session["user"]["id"]
 user_email = session["user"]["email"]
 
-# 3) Load their profile (must have been created at sign-up with an initial credit balance)
+# 3) Load their profile by id
 res = supabase.table("profiles") \
     .select("*") \
-    .eq("email", user_email) \
+    .eq("id", user_id) \
     .single() \
     .execute()
 profile = res.data
@@ -336,12 +337,12 @@ if not profile.get("stripe_customer_id"):
     cust = stripe.Customer.create(email=user_email)
     supabase.table("profiles") \
       .update({"stripe_customer_id": cust["id"]}) \
-      .eq("email", user_email) \
+      .eq("id", user_id) \
       .execute()
     profile["stripe_customer_id"] = cust["id"]
 
 # 5) Now we can show their current credit balance
-credits = profile.get("credit", 0)
+credits = profile.get("credits", 0)
 st.sidebar.header("Your Credits")
 st.sidebar.metric("Remaining", credits)
 
