@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_supabase_auth import login_form, logout_button, signup_form
+from streamlit_supabase_auth import login_form, logout_button
 from supabase import create_client, Client
 from menu import menu, unauthenticated_menu
 import os
@@ -48,7 +48,8 @@ def run_login_page():
             url=SUPABASE_URL,
             apiKey=SUPABASE_KEY,
             providers=["google"],
-            email_password=True
+            email_password=True,
+            show_sign_up=False
         )
         if session:
             user = session['user']
@@ -66,12 +67,12 @@ def run_login_page():
 
     with tab_signup:
         st.subheader("Create a new account")
-        new_user = signup_form(
+        new_user = login_form(
             url=SUPABASE_URL,
             apiKey=SUPABASE_KEY,
+            providers=["google"],
             email_password=True,
-            show_terms=True,
-            providers=["google"]
+            show_sign_up=True,         
         )
         if new_user:
             user = new_user['user']
