@@ -17,7 +17,7 @@ from menu import menu_with_redirect
 import tempfile
 import os
 from streamlit import switch_page
-from Login import main as run_login_page
+from Login import run_login_page as run_login_page
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")

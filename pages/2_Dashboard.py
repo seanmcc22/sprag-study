@@ -10,7 +10,7 @@ import stripe
 import os
 
 # ✅ Import the Login logic directly
-from Login import main as run_login_page
+from Login import run_login_page as run_login_page
 
 # Initialize Supabase client
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
