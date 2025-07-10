@@ -321,7 +321,7 @@ st.title("Sprag - Study Assistant")
 res = supabase.table("profiles") \
     .select("*") \
     .eq("id", user_id) \
-    .single() \
+    .limit(1) \
     .execute()
 profile = res.data
 

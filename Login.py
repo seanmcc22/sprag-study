@@ -40,7 +40,7 @@ def run_login_page():
         apiKey=SUPABASE_KEY,
         providers=["google"]
     )
-    if session:
+    if session is not None:
         user = session['user']
         user_id = user['id']
 
