@@ -14,6 +14,8 @@ from supabase import create_client
 import stripe
 from streamlit_supabase_auth import login_form
 from menu import menu_with_redirect
+import tempfile
+import os
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -543,17 +545,24 @@ if st.button("Run Selected Tasks"):
 
             
             saved_figures = []
-            fig_topics.write_image("fig_topics.pdf")
-            saved_figures.append("fig_topics.pdf")
             
-            fig_qtypes.write_image("fig_qtypes.pdf")
-            saved_figures.append("fig_qtypes.pdf")
+            tmp_dir = tempfile.mkdtemp(dir="/tmp")
             
-            fig_yearly_topics.write_image("df_yearly_topics.pdf")
-            saved_figures.append("df_yearly_topics.pdf")
-            
-            fig_yearly_qtypes.write_image("df_yearly_qtypes.pdf")
-            saved_figures.append("df_yearly_qtypes.pdf")
+            fig_topics_path = os.path.join(tmp_dir, "fig_topics.pdf")
+            fig_topics.write_image(fig_topics_path)
+            saved_figures.append(fig_topics_path)
+
+            fig_qtypes_path = os.path.join(tmp_dir, "fig_qtypes.pdf")            
+            fig_qtypes.write_image(fig_qtypes_path)
+            saved_figures.append(fig_qtypes_path)
+
+            fig_yearly_topics_path = os.path.join(tmp_dir, "df_yearly_topics.pdf")            
+            fig_yearly_topics.write_image(fig_yearly_topics_path)
+            saved_figures.append(fig_yearly_topics_path)
+
+            fig_yearly_qtypes_path = os.path.join(tmp_dir, "df_yearly_qtypes.pdf")
+            fig_yearly_qtypes.write_image(fig_yearly_qtypes_path)
+            saved_figures.append(fig_yearly_qtypes_path)
 
 
             # Typical Instructions
@@ -650,5 +659,3 @@ if st.button("Run Selected Tasks"):
         
 st.markdown("---")
 st.info("Disclaimer: This tool provides AI-generated study support. Always cross check with your materials and syllabus.")
-
-
