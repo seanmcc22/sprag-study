@@ -31,7 +31,6 @@ def create_profile_if_missing(user_id: str):
 
 
 def run_login_page():
-    st.set_page_config(page_title="Login or Signup", layout="centered")
     st.title("Welcome — Please Log In or Sign Up")
 
     st.subheader("Login")
