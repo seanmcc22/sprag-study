@@ -305,56 +305,41 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 # ─── Streamlit App ────────────────────────────────────────────
 
-
 # ─── Authentication & Profile Fetch ──────────────────────────────
 
 menu_with_redirect()
 
-# 2) Extract user info from seesion_state
+# 1) Extract user info from session_state
 user = st.session_state["user"]
 user_id = user["id"]
 user_email = user["email"]
+access_token = st.session_state["access_token"]
 
 st.title("Sprag - Study Assistant")
 
-def get_user_supabase_client(access_token: str) -> Client:
-    return create_client(
-        SUPABASE_URL,
-        SUPABASE_KEY,
-        options={
-            "headers": {
-                "Authorization": f"Bearer {access_token}"
-            }
-        }
-    )
+# ✅ Use your Edge Function instead of direct table query
+profile_res = supabase.rpc(
+    "get-profile",
+    {"user_id": user_id},
+    headers={"Authorization": f"Bearer {access_token}"}
+).execute()
 
-access_token = st.session_state["access_token"]
-
-user_supabase = get_user_supabase_client(access_token)
-
-# 3) Load their profile by id
-res = user_supabase.table("profiles") \
-    .select("*") \
-    .eq("id", user_id) \
-    .limit(1) \
-    .execute()
-profile = res.data[0] if res.data else None
-
-credits = profile["credits"]
+profile = profile_res.data if profile_res.data else None
 
 if not profile:
     st.error("⚠️ Could not load your profile; please contact support.")
     st.stop()
 
-# 4) If they have no Stripe customer ID yet, create one and store it
+credits = profile["credits"]
+
+# 2) If they have no Stripe customer ID yet, create one and store it
 if not profile.get("stripe_customer_id"):
     cust = stripe.Customer.create(email=user_email)
-    user_supabase.table("profiles") \
-      .update({"stripe_customer_id": cust["id"]}) \
-      .eq("id", user_id) \
-      .execute()
+    supabase.table("profiles") \
+        .update({"stripe_customer_id": cust["id"]}) \
+        .eq("id", user_id) \
+        .execute()
     profile["stripe_customer_id"] = cust["id"]
-
 
 subject = st.text_input("Subject (e.g., Atomic Physics)")
 lec_file = st.file_uploader("Lecture Notes PDF (typed only) (MAX 20MB)", type=["pdf"])
