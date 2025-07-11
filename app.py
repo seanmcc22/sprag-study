@@ -12,16 +12,16 @@ import plotly.express as px
 import pandas as pd
 from supabase import create_client, Client
 import stripe
-from streamlit_supabase_auth import login_form
 from menu import menu_with_redirect
 import tempfile
 import os
-from streamlit import switch_page
+import requests
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL")
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
@@ -305,41 +305,60 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 # ─── Streamlit App ────────────────────────────────────────────
 
+
 # ─── Authentication & Profile Fetch ──────────────────────────────
 
 menu_with_redirect()
 
-# 1) Extract user info from session_state
+# 2) Extract user info from seesion_state
 user = st.session_state["user"]
 user_id = user["id"]
 user_email = user["email"]
-access_token = st.session_state["access_token"]
 
 st.title("Sprag - Study Assistant")
 
-# ✅ Use your Edge Function instead of direct table query
-profile_res = supabase.rpc(
-    "get-profile",
-    {"user_id": user_id},
-    headers={"Authorization": f"Bearer {access_token}"}
-).execute()
+# ✅ Fetch the profile via Edge Function (uses JWT, respects RLS)
+def get_user_profile_via_edge_function(access_token: str):
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+    try:
+        response = requests.get(SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL, headers=headers)
+        if response.status_code != 200:
+            st.error(f"Failed to fetch profile: {response.status_code} — {response.text}")
+            return None
+        return response.json()
+    except Exception as e:
+        st.error(f"Error calling get-profile Edge Function: {e}")
+        return None
 
-profile = profile_res.data if profile_res.data else None
+access_token = st.session_state["access_token"]
+
+user_supabase = get_user_profile_via_edge_function(access_token)
+
+# 3) Load their profile by id
+res = user_supabase.table("profiles") \
+    .select("*") \
+    .eq("id", user_id) \
+    .limit(1) \
+    .execute()
+profile = res.data[0] if res.data else None
+
+credits = profile["credits"]
 
 if not profile:
     st.error("⚠️ Could not load your profile; please contact support.")
     st.stop()
 
-credits = profile["credits"]
-
-# 2) If they have no Stripe customer ID yet, create one and store it
+# 4) If they have no Stripe customer ID yet, create one and store it
 if not profile.get("stripe_customer_id"):
     cust = stripe.Customer.create(email=user_email)
-    supabase.table("profiles") \
-        .update({"stripe_customer_id": cust["id"]}) \
-        .eq("id", user_id) \
-        .execute()
+    user_supabase.table("profiles") \
+      .update({"stripe_customer_id": cust["id"]}) \
+      .eq("id", user_id) \
+      .execute()
     profile["stripe_customer_id"] = cust["id"]
+
 
 subject = st.text_input("Subject (e.g., Atomic Physics)")
 lec_file = st.file_uploader("Lecture Notes PDF (typed only) (MAX 20MB)", type=["pdf"])
