@@ -101,6 +101,7 @@ def run_login_page():
             st.stop()
 
         st.session_state['user'] = user
+        st.session_state['access_token'] = access_token
         st.session_state['is_authenticated'] = True
         st.session_state['role'] = profile.get("role", "user")
 
