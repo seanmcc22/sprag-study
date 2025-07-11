@@ -24,9 +24,22 @@ st.set_page_config(page_title="User Dashboard", layout="centered")
 PRICE_10_CREDITS = os.environ.get("stripe_price_id_10_credit_bundle_test")
 PRICE_5_CREDITS = os.environ.get("stripe_price_id_5_credit_bundle_test")
 
+def get_user_supabase_client(access_token: str) -> Client:
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options={
+            "headers": {
+                "Authorization": f"Bearer {access_token}"
+            }
+        }
+    )
+
+access_token = st.session_state["access_token"]
 
 def fetch_profile(user_id: str):
-    response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+    user_supabase = get_user_supabase_client(access_token)
+    response = user_supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
     if not response.data:
         st.error("Error fetching profile data.")
         return None
@@ -79,7 +92,7 @@ def main():
     user_id = user["id"]
     user_email = user["email"]
 
-    profile = fetch_profile(user_id)
+    profile = fetch_profile(user_id, access_token)
     if not profile:
         st.stop()
 

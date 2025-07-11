@@ -7,10 +7,21 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ✅ Helper to make a client WITH user JWT
+def get_user_supabase_client(access_token: str) -> Client:
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options={
+            "headers": {
+                "Authorization": f"Bearer {access_token}"
+            }
+        }
+    )
 
-def get_user_profile(user_id: str, access_token: str):
+def get_user_profile(user_supabase: Client, user_id: str):
     """Fetch user profile by user id."""
-    response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute(headers={"Authorization": f"Bearer {access_token}"})
+    response = user_supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
     if not response.data:
         return None
 
@@ -18,16 +29,17 @@ def get_user_profile(user_id: str, access_token: str):
     return profile
 
 
-def create_profile_if_missing(user_id: str, access_token: str):
+def create_profile_if_missing(user_supabase: Client, user_id: str):
     """Create a profile if one doesn't exist yet."""
-    profile = get_user_profile(user_id, access_token)
+    profile = get_user_profile(user_supabase, user_id)
     if not profile:
         try:
-            insert_response = supabase.table("profiles").insert({
+            insert_response = user_supabase.table("profiles").insert({
+                # Don't insert ID — DB default handles it!
                 "credits": 0,
                 "is_subscribed": False,
                 "stripe_customer_id": ""
-            }).execute(headers={"Authorization": f"Bearer {access_token}"})
+            }).execute()
             if insert_response.data:
                 st.info("Profile created.")
         except Exception as e:
@@ -52,6 +64,7 @@ def run_login_page():
     if session is not None:
         user = session.get('user')
         access_token = session.get('access_token')
+        st.session_state["access token"] = access_token
 
         if not user:
             st.warning("No user info found in session. Please try logging in again.")
@@ -66,9 +79,12 @@ def run_login_page():
             st.warning("No user ID found. Something is wrong with the session.")
             st.stop()
 
-        create_profile_if_missing(user_id, access_token)
+        # ✅ Get a Supabase client scoped to this user
+        user_supabase = get_user_supabase_client(access_token)
 
-        profile = get_user_profile(user_id, access_token)
+        create_profile_if_missing(user_supabase, user_id)
+
+        profile = get_user_profile(user_supabase, user_id)
         if not profile:
             st.error("Could not load your profile. Please contact support.")
             st.stop()

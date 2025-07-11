@@ -317,8 +317,23 @@ user_email = user["email"]
 
 st.title("Sprag - Study Assistant")
 
+def get_user_supabase_client(access_token: str) -> Client:
+    return create_client(
+        SUPABASE_URL,
+        SUPABASE_KEY,
+        options={
+            "headers": {
+                "Authorization": f"Bearer {access_token}"
+            }
+        }
+    )
+
+access_token = st.session_state["access_token"]
+
+user_supabase = get_user_supabase_client(access_token)
+
 # 3) Load their profile by id
-res = supabase.table("profiles") \
+res = user_supabase.table("profiles") \
     .select("*") \
     .eq("id", user_id) \
     .limit(1) \
@@ -334,7 +349,7 @@ if not profile:
 # 4) If they have no Stripe customer ID yet, create one and store it
 if not profile.get("stripe_customer_id"):
     cust = stripe.Customer.create(email=user_email)
-    supabase.table("profiles") \
+    user_supabase.table("profiles") \
       .update({"stripe_customer_id": cust["id"]}) \
       .eq("id", user_id) \
       .execute()
