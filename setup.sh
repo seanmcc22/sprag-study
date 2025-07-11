@@ -1,6 +1,6 @@
 set -e
 
-apt-get update && apt-get install -y texlive-xetex
+apt-get update && apt-get install -y texlive-latex-base latexmk
 
 mkdir -p ~/.streamlit/
 echo "\
