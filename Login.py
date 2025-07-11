@@ -91,7 +91,7 @@ def run_login_page():
             st.stop()
 
         # ✅ Call Edge Function to create the profile if missing
-        if not create_profile_if_missing(user_id):
+        if not create_profile_if_missing(user_id, access_token):
             st.stop()
 
         # ✅ Then fetch the profile using the other Edge Function
