@@ -10,7 +10,7 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_EDGE_FUNCTION_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_URL")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-admin_supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+admin_supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ Helper to make a client WITH user JWT
 def get_user_supabase_client(access_token: str) -> Client:
