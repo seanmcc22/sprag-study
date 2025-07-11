@@ -16,6 +16,7 @@ from menu import menu_with_redirect
 import tempfile
 import os
 import requests
+from streamlit_supabase_auth import login_form
 
 # ─── Supabase & Stripe Initialization ──────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -309,6 +310,18 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 
 # ─── Authentication & Profile Fetch ──────────────────────────────
+
+if "access_token" not in st.session_state:
+    session = login_form(
+        url = SUPABASE_URL,
+        apiKey = SUPABASE_KEY,
+        providers = ["google"]
+        )
+    if session:
+        st.session_state["user"] = session["user"]
+        st.session_state["access_token"] = session["access_token"]
+    else:
+        st.stop()
 
 menu_with_redirect()
 
@@ -676,7 +689,7 @@ if st.button("Run Selected Tasks"):
 
         try:
             response = requests.post(
-                SUPABASE_EDGE_FUNCTION_CREDOT_DEDUCTION_URL,
+                SUPABASE_EDGE_FUNCTION_CREDIT_DEDUCTION_URL,
                 headers=headers,
                 json=body
             )
