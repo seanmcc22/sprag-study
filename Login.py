@@ -6,11 +6,10 @@ import requests
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-SUPABASE_EDGE_FUNCTION_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_URL")
+SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL")
+SUPABASE_EDGE_FUNCTION_CREATE_PROFILE_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_CREATE_PROFILE_URL")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-admin_supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ Helper to make a client WITH user JWT
 def get_user_supabase_client(access_token: str) -> Client:
@@ -24,37 +23,36 @@ def get_user_supabase_client(access_token: str) -> Client:
         }
     )
 
-# ✅ NEW: Call Edge Function instead of direct select
+# ✅ NEW: Call Edge Function to create profile if missing
+def create_profile_if_missing(user_id: str):
+    """Calls the create-profile-if-missing Edge Function."""
+    try:
+        response = requests.post(
+            SUPABASE_EDGE_FUNCTION_CREATE_PROFILE_URL,
+            json={"user_id": user_id}
+        )
+        if response.status_code != 200:
+            st.error(f"Failed to create profile: {response.status_code} — {response.text}")
+            return False
+        return True
+    except Exception as e:
+        st.error(f"Error calling create-profile-if-missing Edge Function: {e}")
+        return False
+
+# ✅ Fetch the profile via Edge Function (uses JWT, respects RLS)
 def get_user_profile_via_edge_function(access_token: str):
-    """Call your Edge Function to get the profile for the logged-in user."""
     headers = {
         "Authorization": f"Bearer {access_token}"
     }
     try:
-        response = requests.get(SUPABASE_EDGE_FUNCTION_URL, headers=headers)
+        response = requests.get(SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL, headers=headers)
         if response.status_code != 200:
             st.error(f"Failed to fetch profile: {response.status_code} — {response.text}")
             return None
         return response.json()
     except Exception as e:
-        st.error(f"Error calling get-profile function: {e}")
+        st.error(f"Error calling get-profile Edge Function: {e}")
         return None
-
-def create_profile_if_missing(user_id: str):
-    """Create a profile if one doesn't exist yet — bypassing RLS with service role."""
-    response = admin_supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
-    if not response.data:
-        try:
-            insert_response = admin_supabase.table("profiles").insert({
-                "id": user_id,
-                "credits": 0,
-                "is_subscribed": False,
-                "stripe_customer_id": ""
-            }).execute()
-            if insert_response.data:
-                st.info("Profile created.")
-        except Exception as e:
-            st.error(f"Error creating profile: {e}")
 
 def run_login_page():
     st.title("Welcome — Please Log In or Sign Up")
@@ -88,10 +86,11 @@ def run_login_page():
             st.warning("No user ID found. Something is wrong with the session.")
             st.stop()
 
-        # ✅ Create profile using ADMIN client if missing
-        create_profile_if_missing(user_id)
+        # ✅ Call Edge Function to create the profile if missing
+        if not create_profile_if_missing(user_id):
+            st.stop()
 
-        # ✅ Fetch profile via Edge Function (uses token, respects RLS)
+        # ✅ Then fetch the profile using the other Edge Function
         profile = get_user_profile_via_edge_function(access_token)
         if not profile:
             st.error("Could not load your profile. Please contact support.")
