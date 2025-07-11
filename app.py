@@ -22,6 +22,7 @@ SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL")
+SUPABASE_EDGE_FUNCTION_SET_CUSTOMER_STRIPE_ID_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_SET_CUSTOMER_STRIPE_ID_URL")
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
@@ -340,18 +341,37 @@ if not profile:
 
 credits = profile["credits"]
 
-# 3) Create a Supabase client authorized with the user's token for updates
-user_supabase = get_user_supabase_client(access_token)
-
 # 4) If they have no Stripe customer ID yet, create one and store it
 if not profile.get("stripe_customer_id"):
+    # 1) Create the Stripe Customer
     cust = stripe.Customer.create(email=user_email)
-    user_supabase.table("profiles") \
-        .update({"stripe_customer_id": cust["id"]}) \
-        .eq("id", user_id) \
-        .execute()
-    profile["stripe_customer_id"] = cust["id"]
+    stripe_customer_id = cust["id"]
 
+    # 2) Call your Edge Function to store it (JWT + user_id + new ID)
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "user_id": user_id,
+        "stripe_customer_id": stripe_customer_id
+    }
+
+    response = requests.post(
+        SUPABASE_EDGE_FUNCTION_SET_CUSTOMER_STRIPE_ID_URL,
+        headers=headers,
+        json=payload
+    )
+
+    if response.status_code != 200:
+        st.error(f"Failed to set Stripe customer ID: {response.status_code} — {response.text}")
+        st.stop()
+
+    # 3) Update local copy too, so you can keep using `profile`
+    profile["stripe_customer_id"] = stripe_customer_id
+
+
+# Actual App Logic
 subject = st.text_input("Subject (e.g., Atomic Physics)")
 lec_file = st.file_uploader("Lecture Notes PDF (typed only) (MAX 20MB)", type=["pdf"])
 paper_file = st.file_uploader("Past Paper PDFs (MAX 20MB)", type=["pdf"], accept_multiple_files=True)
