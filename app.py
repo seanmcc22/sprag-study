@@ -23,6 +23,7 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_GET_PROFILE_URL")
 SUPABASE_EDGE_FUNCTION_SET_CUSTOMER_STRIPE_ID_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_SET_CUSTOMER_STRIPE_ID_URL")
+SUPABASE_EDGE_FUNCTION_CREDIT_DEDUCTION_URL = os.environ.get("SUPABASE_EDGE_FUNCTION_CREDIT_DEDUCTION_URL")
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
@@ -665,12 +666,31 @@ if st.button("Run Selected Tasks"):
             
         # ───  DEDUCT CREDITS NOW ─────────────────────────────────
     new_credits = credits - cost
-    # update Supabase
-    supabase.table("profiles") \
-        .update({"credits": new_credits}) \
-        .eq("id", user_id) \
-        .execute()
-    # show updated balance in sidebar
+    # Call Edge Function instead:
+    def deduct_credits_via_edge_function(access_token: str, cost: float):
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json"
+            }
+        body = {"cost": cost}
+
+        try:
+            response = requests.post(
+                SUPABASE_EDGE_FUNCTION_CREDOT_DEDUCTION_URL,
+                headers=headers,
+                json=body
+            )
+            if response.status_code != 200:
+                st.error(f"Error deducting credits: {response.status_code} — {response.text}")
+                st.stop()
+            return response.json()
+        except Exception as e:
+            st.error(f"Error calling deduct-credits Edge Function: {e}")
+            st.stop()
+
+    # Call it:
+    deduct_result = deduct_credits_via_edge_function(access_token, cost)
+    new_credits = deduct_result["credits"]
     st.sidebar.metric("Remaining Credits", new_credits)
 
     # ───  THEN RENDER OUTPUT ────────────────────────────────
