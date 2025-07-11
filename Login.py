@@ -24,11 +24,15 @@ def get_user_supabase_client(access_token: str) -> Client:
     )
 
 # ✅ NEW: Call Edge Function to create profile if missing
-def create_profile_if_missing(user_id: str):
+def create_profile_if_missing(user_id: str, access_token: str):
     """Calls the create-profile-if-missing Edge Function."""
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+        }
     try:
         response = requests.post(
             SUPABASE_EDGE_FUNCTION_CREATE_PROFILE_URL,
+            headers=headers,
             json={"user_id": user_id}
         )
         if response.status_code != 200:
