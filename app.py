@@ -677,44 +677,47 @@ if st.button("Run Selected Tasks"):
         \end{center}
             """ % safe_fig
             
-        # ───  DEDUCT CREDITS NOW ─────────────────────────────────
-    new_credits = credits - cost
-    # Call Edge Function instead:
-    def deduct_credits_via_edge_function(access_token: str, cost: float):
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json"
-            }
-        body = {"cost": cost}
-
-        try:
-            response = requests.post(
-                SUPABASE_EDGE_FUNCTION_CREDIT_DEDUCTION_URL,
-                headers=headers,
-                json=body
-            )
-            if response.status_code != 200:
-                st.error(f"Error deducting credits: {response.status_code} — {response.text}")
-                st.stop()
-            return response.json()
-        except Exception as e:
-            st.error(f"Error calling deduct-credits Edge Function: {e}")
-            st.stop()
-
-    # Call it:
-    deduct_result = deduct_credits_via_edge_function(access_token, cost)
-    new_credits = deduct_result["credits"]
-    st.sidebar.metric("Remaining Credits", new_credits)
-
-    # ───  THEN RENDER OUTPUT ────────────────────────────────
+    # ─── THEN RENDER OUTPUT ────────────────────────────────
     if latex_body:
         with st.spinner("Rendering PDF…"):
-            pdf_fn = create_pdf_with_pylatex(latex_body, subject)
-            st.success("✅ Your study materials are ready!")
-            with open(pdf_fn, "rb") as f:
-                st.download_button("Download PDF", f, file_name=pdf_fn)
+            try:
+                pdf_fn = create_pdf_with_pylatex(latex_body, subject)
+            except Exception as e:
+                st.error(f"❌ PDF generation failed: {e}")
+                st.stop()
+
+        st.success("✅ Your study materials are ready!")
+        with open(pdf_fn, "rb") as f:
+            st.download_button("Download PDF", f, file_name=pdf_fn)
+
+        # ─── NOW DEDUCT CREDITS ─────────────────────────────
+        def deduct_credits_via_edge_function(access_token: str, cost: float):
+            headers = {
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json"
+            }
+            body = {"cost": cost}
+
+            try:
+                response = requests.post(
+                    SUPABASE_EDGE_FUNCTION_CREDIT_DEDUCTION_URL,
+                    headers=headers,
+                    json=body
+                )
+                if response.status_code != 200:
+                    st.error(f"Error deducting credits: {response.status_code} — {response.text}")
+                    st.stop()
+                return response.json()
+            except Exception as e:
+                st.error(f"Error calling deduct-credits Edge Function: {e}")
+                st.stop()
+
+        deduct_result = deduct_credits_via_edge_function(access_token, cost)
+        new_credits = deduct_result["credits"]
+        st.sidebar.metric("Remaining Credits", new_credits)
+
     else:
-        st.warning("No output generated — please check your selections.")
-        
+        st.warning("⚠️ No output generated — please check your selections.")
+
 st.markdown("---")
 st.info("Disclaimer: This tool provides AI-generated study support. Always cross check with your materials and syllabus.")
