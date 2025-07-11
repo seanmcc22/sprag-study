@@ -1,3 +1,7 @@
+set -e
+
+apt-get update && apt-get install -y texlive-xetex
+
 mkdir -p ~/.streamlit/
 echo "\
 [server]\n\
