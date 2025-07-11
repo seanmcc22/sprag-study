@@ -8,9 +8,9 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def get_user_profile(user_id: str):
+def get_user_profile(supabase_client: Client, user_id: str):
     """Fetch user profile by user id."""
-    response = supabase.table("profiles").select("*").eq("id", user_id).limit(1).execute()
+    response = supabase_client.table("profiles").select("*").eq("id", user_id).limit(1).execute()
 
     if not response.data:
         return None
@@ -20,12 +20,13 @@ def get_user_profile(user_id: str):
     return profile
 
 
-def create_profile_if_missing(user_id: str):
+def create_profile_if_missing(supabase_client: Client, user_id: str):
     """Create a profile if one doesn't exist yet."""
-    profile = get_user_profile(user_id)
+    profile = get_user_profile(supabase_client, user_id)
     if not profile:
         try:
-            insert_response = supabase.table("profiles").insert({
+            insert_response = supabase_client.table("profiles").insert({
+                # omit "id" to use default auth.uid()
                 "credits": 0,
                 "is_subscribed": False,
                 "stripe_customer_id": ""
@@ -54,8 +55,14 @@ def run_login_page():
 
     if session is not None:
         user = session.get('user')
+        access_token = session.get('access_token')
+
         if not user:
             st.warning("No user info found in session. Please try logging in again.")
+            st.stop()
+
+        if not access_token:
+            st.warning("No access token found in session. Cannot authenticate requests.")
             st.stop()
 
         user_id = user.get('id')
@@ -63,9 +70,13 @@ def run_login_page():
             st.warning("No user ID found. Something is wrong with the session.")
             st.stop()
 
-        create_profile_if_missing(user_id)
+        # Create a Supabase client with the logged-in user's access token
+        user_supabase = create_client(SUPABASE_URL, access_token)
 
-        profile = get_user_profile(user_id)
+        # Use the user-scoped client for all profile queries
+        create_profile_if_missing(user_supabase, user_id)
+
+        profile = get_user_profile(user_supabase, user_id)
         if not profile:
             st.error("Could not load your profile. Please contact support.")
             st.stop()
