@@ -310,14 +310,15 @@ def create_pdf_with_pylatex(latex_body: str, subject_title: str = "") -> str:
 
 menu_with_redirect()
 
-# 2) Extract user info from seesion_state
+# 1) Extract user info from session_state
 user = st.session_state["user"]
 user_id = user["id"]
 user_email = user["email"]
+access_token = st.session_state["access_token"]
 
 st.title("Sprag - Study Assistant")
 
-# ✅ Fetch the profile via Edge Function (uses JWT, respects RLS)
+# 2) Fetch the profile via Edge Function (uses JWT, respects RLS)
 def get_user_profile_via_edge_function(access_token: str):
     headers = {
         "Authorization": f"Bearer {access_token}"
@@ -332,33 +333,24 @@ def get_user_profile_via_edge_function(access_token: str):
         st.error(f"Error calling get-profile Edge Function: {e}")
         return None
 
-access_token = st.session_state["access_token"]
-
-user_supabase = get_user_profile_via_edge_function(access_token)
-
-# 3) Load their profile by id
-res = user_supabase.table("profiles") \
-    .select("*") \
-    .eq("id", user_id) \
-    .limit(1) \
-    .execute()
-profile = res.data[0] if res.data else None
-
-credits = profile["credits"]
-
+profile = get_user_profile_via_edge_function(access_token)
 if not profile:
     st.error("⚠️ Could not load your profile; please contact support.")
     st.stop()
+
+credits = profile["credits"]
+
+# 3) Create a Supabase client authorized with the user's token for updates
+user_supabase = get_user_supabase_client(access_token)
 
 # 4) If they have no Stripe customer ID yet, create one and store it
 if not profile.get("stripe_customer_id"):
     cust = stripe.Customer.create(email=user_email)
     user_supabase.table("profiles") \
-      .update({"stripe_customer_id": cust["id"]}) \
-      .eq("id", user_id) \
-      .execute()
+        .update({"stripe_customer_id": cust["id"]}) \
+        .eq("id", user_id) \
+        .execute()
     profile["stripe_customer_id"] = cust["id"]
-
 
 subject = st.text_input("Subject (e.g., Atomic Physics)")
 lec_file = st.file_uploader("Lecture Notes PDF (typed only) (MAX 20MB)", type=["pdf"])
