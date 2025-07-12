@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e
 echo "Starting setup.sh..."
 
